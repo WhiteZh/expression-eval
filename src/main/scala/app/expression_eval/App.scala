@@ -1,6 +1,6 @@
 package app.expression_eval
 
-import app.expression_eval.ast.Parser
+import app.expression_eval.ast.ExpressionParser
 import app.expression_eval.token.TokenReader
 import lib.util.unreachable
 
@@ -27,5 +27,5 @@ object App:
     private def evaluate(iter: Iterator[Char]): Either[Error, NumericType] =
         for
             tokens <- TokenReader(iter).parsed
-            value <- Parser.parse(tokens)
-        yield value
+            node <- ExpressionParser.parse(tokens)
+        yield node.evaluate
