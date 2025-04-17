@@ -1,6 +1,6 @@
 package app.expression_eval
 
-import app.expression_eval.ast.ExpressionParser
+import app.expression_eval.ast.Parser
 import app.expression_eval.token.TokenReader
 import lib.util.unreachable
 
@@ -19,9 +19,7 @@ object App:
     private def run(iter: Iterator[Char]): Unit =
         try
             evaluate(iter) match
-                case Left(e)      => e match
-                    case e: TokenReader.ParseError       => println(s"ParseError: $e")
-                    case e: ExpressionParser.SyntaxError => println(s"SyntaxError: $e")
+                case Left(e)      => println(e)
                 case Right(value) => println(s"=> $value")
         catch
             case e: Exception => e.printStackTrace()
@@ -29,5 +27,5 @@ object App:
     private def evaluate(iter: Iterator[Char]): Either[Error, NumericType] =
         for
             tokens <- TokenReader(iter).parsed
-            node <- ExpressionParser.parse(tokens)
-        yield node.evaluate
+            value <- Parser.parse(tokens)
+        yield value

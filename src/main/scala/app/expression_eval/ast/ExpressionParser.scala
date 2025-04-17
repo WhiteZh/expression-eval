@@ -7,11 +7,13 @@ import lib.util.ExplicitStatePassing.*
 import scala.collection.mutable.ListBuffer
 import scala.util.control.TailCalls.*
 
-object ExpressionParser:
+object ExpressionParser extends Parser[Node]:
     enum SyntaxError extends Error:
         case UnexpectedTokens(tokens: List[Token])
         case MissingEnclosingBracket
         case SyntaxError
+
+        override def toString: String = s"SyntaxError: $this"
 
     private enum Element:
         case Number(value: NumericType)
@@ -141,7 +143,7 @@ object ExpressionParser:
 
                         case _ => returnResult(Left(SyntaxError.SyntaxError))
 
-    def parse(tokens: List[Token]): Either[SyntaxError, Node] =
+    override def parse(tokens: List[Token]): Either[SyntaxError, Node] =
         for
             elementList <- ElementListParser.parse(tokens)
             operatorChain <- OperatorChainParser.parse(elementList)

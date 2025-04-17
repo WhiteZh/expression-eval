@@ -38,6 +38,8 @@ object TokenReader:
     enum ParseError extends Error:
         case NoMatch
 
+        override def toString: String = s"ParseError: $this"
+
 
 class TokenReader(private val rawReader: Iterator[Char]) extends Iterable[Either[ParseError, Token]]:
     private val tokens: LazyList[Either[ParseError, Token]] =
