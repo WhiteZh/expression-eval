@@ -1,0 +1,146 @@
+package app.expression_eval
+
+import scala.collection.mutable.ListBuffer
+import scala.util.control.TailCalls.*
+import lib.util.ExplicitStatePassing.*
+
+object ExpressionParser:
+    enum SyntaxError:
+        case UnexpectedTokens(tokens: List[Token])
+        case MissingEnclosingBracket
+        case SyntaxError
+
+    private enum Element:
+        case Number(value: NumericType)
+        case OperatorPlus
+        case OperatorMinus
+        case OperatorTimes
+        case OperatorDiv
+        case Bracket(elements: List[Element])
+
+    private object Element:
+        type UnaryOpType = OperatorPlus.type | OperatorMinus.type
+        type BinaryOpType = OperatorPlus.type | OperatorMinus.type | OperatorTimes.type | OperatorDiv.type
+
+    private object ElementListParser:
+
+        private type OneToOneToken = Token.Number |
+                                     Token.OperatorPlus.type |
+                                     Token.OperatorMinus.type |
+                                     Token.OperatorTimes.type |
+                                     Token.OperatorDiv.type
+
+        extension (token: OneToOneToken)
+            private def toElement: Element = token match
+                case Token.Number(x)     => Element.Number(x)
+                case Token.OperatorPlus  => Element.OperatorPlus
+                case Token.OperatorMinus => Element.OperatorMinus
+                case Token.OperatorTimes => Element.OperatorTimes
+                case Token.OperatorDiv   => Element.OperatorDiv
+
+        private def partialParse
+            (buffer: ListBuffer[Element], tokens: List[Token])
+            (insideBracket: Boolean)
+        : TailRec[Either[SyntaxError, (ListBuffer[Element], List[Token])]] =
+            tokens match
+                case (token: OneToOneToken) :: resTokens => tailcall(partialParse(buffer :+ token.toElement, resTokens)(insideBracket))
+
+                case Token.BracketStart :: resTokens =>
+                    partialParse(ListBuffer.empty, resTokens)(true).result match
+                        case Left(x)                       => done(Left(x))
+                        case Right(innerBuffer, resTokens) => tailcall(partialParse(buffer :+ Element.Bracket(innerBuffer.toList), resTokens)(insideBracket))
+
+                case Token.BracketEnd :: resTokens => done(if insideBracket then Right((buffer, resTokens))
+                                                           else Left(SyntaxError.UnexpectedTokens(Token.BracketEnd :: resTokens)))
+                case Nil                           => done(if insideBracket then Left(SyntaxError.MissingEnclosingBracket)
+                                                           else Right((buffer, Nil)))
+
+        def parse(tokens: List[Token]): Either[SyntaxError, List[Element]] =
+            partialParse(ListBuffer.empty, tokens)(false).result.flatMap:
+                case (elements, Nil) => Right(elements.toList)
+                case (_, tokens)     => Left(SyntaxError.UnexpectedTokens(tokens))
+
+    private object OperatorChain:
+        type OpType = (NumericType, NumericType) => NumericType
+        type BodyLike = (Int, OpType, Node)
+
+        def fromSeq(a: Node, seq: Seq[BodyLike]): OperatorChain =
+            val bodySeq = seq.foldRight(None: Option[Body]):
+                (body, next) =>
+                    val (precedence: Int, op: OpType, b: Node) = body
+                    Some(Body(precedence, op, b, next))
+
+            OperatorChain(Head(a, bodySeq))
+
+        private case class Head(a: Node, next: Option[Body] = None)
+
+        private case class Body(precedence: Int, op: OpType, b: Node, next: Option[Body] = None)
+
+    private class OperatorChain private(private val head: OperatorChain.Head):
+
+        import OperatorChain.{Body, Head}
+
+        def toNode: Node = head.next match {
+            case None       => head.a
+            case Some(next) => stateLoop(head.a, next):
+                (a, body) =>
+                    body.next match
+                        case None       => returnResult(Node.BinaryOp(body.op, a, body.b))
+                        case Some(next) => if body.precedence >= next.precedence
+                                           then updateState(Node.BinaryOp(body.op, a, body.b), next)
+                                           else updateState(a, Body(body.precedence,
+                                                                    body.op,
+                                                                    Node.BinaryOp(next.op, body.b, next.b),
+                                                                    next.next))
+        }
+
+    private object OperatorChainParser:
+
+        import Element.*
+
+        extension (op: UnaryOpType)
+            private def buildNodeWith(value: Node): Node = op match
+                case OperatorPlus  => Node.UnaryOp(identity, value)
+                case OperatorMinus => Node.UnaryOp(-_, value)
+
+        private def compressUnaryOps(ops: Iterable[UnaryOpType], value: Node): Node =
+            ops.foldLeft(value)((node, op) => op.buildNodeWith(node))
+
+        private def takeFirstNode(elements: List[Element]): Either[SyntaxError, (Node, List[Element])] =
+            stateLoop(ListBuffer.empty: ListBuffer[UnaryOpType], elements) {
+                case (buffer, Number(num) :: restList)            => returnResult(Right((compressUnaryOps(buffer, Node.Value(num)), restList)))
+                case (buffer, Bracket(innerElements) :: restList) => returnResult:
+                    val inner = OperatorChainParser.parse(innerElements)
+                    inner.map { innerOPC => (compressUnaryOps(buffer, innerOPC.toNode), restList) }
+                case (buffer, (unaryOp: UnaryOpType) :: restList) => updateState(buffer :+ unaryOp, restList)
+                case (_, _ :: _)                                  => returnResult(Left(SyntaxError.SyntaxError))
+                case (_, Nil)                                     => returnResult(Left(SyntaxError.SyntaxError))
+            }
+
+        extension (op: BinaryOpType)
+            private def buildBodyLikeWith(node: Node): OperatorChain.BodyLike = op match
+                case OperatorPlus  => (1, _ + _, node)
+                case OperatorMinus => (1, _ - _, node)
+                case OperatorTimes => (2, _ * _, node)
+                case OperatorDiv   => (2, _ / _, node)
+
+        def parse(elements: List[Element]): Either[SyntaxError, OperatorChain] =
+            takeFirstNode(elements).flatMap:
+                (head, tailElements) =>
+                    stateLoop(ListBuffer.empty: ListBuffer[OperatorChain.BodyLike], tailElements):
+                        case (buffer, Nil)                                => returnResult(Right(OperatorChain.fromSeq(head, Seq.empty)))
+                        case (buffer, (op: BinaryOpType) :: tailElements) => takeFirstNode(tailElements) match
+                            case Left(e)                   => returnResult(Left(e))
+                            case Right(node, Nil)          => returnResult:
+                                val bodyLikeList  = (buffer :+ op.buildBodyLikeWith(node)).toList
+                                val operatorChain = OperatorChain.fromSeq(head, bodyLikeList)
+                                Right(operatorChain)
+                            case Right(node, tailElements) => updateState(buffer :+ op.buildBodyLikeWith(node), tailElements)
+
+                        case _ => returnResult(Left(SyntaxError.SyntaxError))
+
+    def parse(tokens: List[Token]): Either[SyntaxError, Node] =
+        for
+            elementList <- ElementListParser.parse(tokens)
+            operatorChain <- OperatorChainParser.parse(elementList)
+        yield operatorChain.toNode
