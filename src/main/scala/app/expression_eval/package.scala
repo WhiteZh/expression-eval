@@ -1,6 +1,7 @@
 package app
 
 package object expression_eval:
-    def unreachable: Nothing = throw new AssertionError("The unreachable is reached!")
+    
+    trait Error
 
     type NumericType = Double

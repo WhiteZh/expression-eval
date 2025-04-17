@@ -1,5 +1,9 @@
 package app.expression_eval
 
+import app.expression_eval.ast.ExpressionParser
+import app.expression_eval.token.TokenReader
+import lib.util.unreachable
+
 import scala.io.Source
 
 object App:
@@ -12,7 +16,7 @@ object App:
             case Array(name) => run(Source.fromURL(name).iter)
             case _           => unreachable
 
-    private def run(iter: Iterator[Char]): Unit = {
+    private def run(iter: Iterator[Char]): Unit =
         try
             evaluate(iter) match
                 case Left(e)      => e match
@@ -21,9 +25,6 @@ object App:
                 case Right(value) => println(s"=> $value")
         catch
             case e: Exception => e.printStackTrace()
-    }
-
-    private type Error = TokenReader.ParseError | ExpressionParser.SyntaxError
 
     private def evaluate(iter: Iterator[Char]): Either[Error, NumericType] =
         for

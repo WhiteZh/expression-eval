@@ -1,6 +1,7 @@
-package app.expression_eval
+package app.expression_eval.token
 
-import app.expression_eval.TokenReader.{Matcher, ParseError}
+import app.expression_eval.Error
+import app.expression_eval.token.TokenReader.{Matcher, ParseError}
 
 import scala.util.Try
 
@@ -26,17 +27,15 @@ object TokenReader:
                     val (chunk, restBuffer) = buffer.span(c => c.isDigit || c == '.')
                     Try(chunk.mkString.toDouble).toOption.map { x => (Token.Number(x), restBuffer) }
 
-        val candidates: List[Matcher] = List(
-            LiteralMatcher("+".toList, Token.OperatorPlus),
-            LiteralMatcher("-".toList, Token.OperatorMinus),
-            LiteralMatcher("*".toList, Token.OperatorTimes),
-            LiteralMatcher("/".toList, Token.OperatorDiv),
-            LiteralMatcher("(".toList, Token.BracketStart),
-            LiteralMatcher(")".toList, Token.BracketEnd),
-            NumberMatcher,
-            )
+        val candidates: List[Matcher] = List(LiteralMatcher("+".toList, Token.Plus),
+                                             LiteralMatcher("-".toList, Token.Minus),
+                                             LiteralMatcher("*".toList, Token.Times),
+                                             LiteralMatcher("/".toList, Token.Div),
+                                             LiteralMatcher("(".toList, Token.BracketStart),
+                                             LiteralMatcher(")".toList, Token.BracketEnd),
+                                             NumberMatcher)
 
-    enum ParseError:
+    enum ParseError extends Error:
         case NoMatch
 
 

@@ -1,4 +1,6 @@
-package app.expression_eval
+package app.expression_eval.ast
+
+import app.expression_eval.NumericType
 
 enum Node:
     case Value(x: NumericType)

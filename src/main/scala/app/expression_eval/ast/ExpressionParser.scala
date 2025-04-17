@@ -1,11 +1,14 @@
-package app.expression_eval
+package app.expression_eval.ast
+
+import app.expression_eval.token.Token
+import app.expression_eval.{Error, NumericType}
+import lib.util.ExplicitStatePassing.*
 
 import scala.collection.mutable.ListBuffer
 import scala.util.control.TailCalls.*
-import lib.util.ExplicitStatePassing.*
 
 object ExpressionParser:
-    enum SyntaxError:
+    enum SyntaxError extends Error:
         case UnexpectedTokens(tokens: List[Token])
         case MissingEnclosingBracket
         case SyntaxError
@@ -25,18 +28,18 @@ object ExpressionParser:
     private object ElementListParser:
 
         private type OneToOneToken = Token.Number |
-                                     Token.OperatorPlus.type |
-                                     Token.OperatorMinus.type |
-                                     Token.OperatorTimes.type |
-                                     Token.OperatorDiv.type
+                                     Token.Plus.type |
+                                     Token.Minus.type |
+                                     Token.Times.type |
+                                     Token.Div.type
 
         extension (token: OneToOneToken)
             private def toElement: Element = token match
-                case Token.Number(x)     => Element.Number(x)
-                case Token.OperatorPlus  => Element.OperatorPlus
-                case Token.OperatorMinus => Element.OperatorMinus
-                case Token.OperatorTimes => Element.OperatorTimes
-                case Token.OperatorDiv   => Element.OperatorDiv
+                case Token.Number(x) => Element.Number(x)
+                case Token.Plus      => Element.OperatorPlus
+                case Token.Minus     => Element.OperatorMinus
+                case Token.Times     => Element.OperatorTimes
+                case Token.Div       => Element.OperatorDiv
 
         private def partialParse
             (buffer: ListBuffer[Element], tokens: List[Token])
@@ -80,7 +83,7 @@ object ExpressionParser:
 
         import OperatorChain.{Body, Head}
 
-        def toNode: Node = head.next match {
+        def toNode: Node = head.next match
             case None       => head.a
             case Some(next) => stateLoop(head.a, next):
                 (a, body) =>
@@ -92,7 +95,6 @@ object ExpressionParser:
                                                                     body.op,
                                                                     Node.BinaryOp(next.op, body.b, next.b),
                                                                     next.next))
-        }
 
     private object OperatorChainParser:
 
