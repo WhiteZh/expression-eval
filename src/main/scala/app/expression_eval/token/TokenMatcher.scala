@@ -20,16 +20,12 @@ object TokenMatcher:
         def this(literal: String, token: Token) = this(literal.toList, token)
         
         override def apply(buffer: LazyList[Char]): Option[(Token, LazyList[Char])] =
-            if buffer.head.isWhitespace then apply(buffer.dropWhile(_.isWhitespace))
-            else
-                val (firstHalf, secondHalf) = buffer.splitAt(literal.length)
-                if firstHalf.length < literal.length then None
-                else if !firstHalf.zip(literal).forall(_ == _) then None
-                     else Some(token, secondHalf.dropWhile(_.isWhitespace))
+            val (firstHalf, secondHalf) = buffer.splitAt(literal.length)
+            if firstHalf.length < literal.length then None
+            else if !firstHalf.zip(literal).forall(_ == _) then None
+                 else Some(token, secondHalf.dropWhile(_.isWhitespace))
 
     object NumberTokenMatcher extends TokenMatcher:
         override def apply(buffer: LazyList[Char]): Option[(Token, LazyList[Char])] =
-            if buffer.head.isWhitespace then apply(buffer.dropWhile(_.isWhitespace))
-            else
-                val (chunk, restBuffer) = buffer.span(c => c.isDigit || c == '.')
-                Try(chunk.mkString.toDouble).toOption.map { x => (Token.Number(x), restBuffer) }
+            val (chunk, restBuffer) = buffer.span(c => c.isDigit || c == '.')
+            Try(chunk.mkString.toDouble).toOption.map { x => (Token.Number(x), restBuffer) }

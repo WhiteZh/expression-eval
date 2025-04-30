@@ -2,6 +2,7 @@ package app.expression_eval.token
 
 import app.expression_eval.Error
 import app.expression_eval.token.TokenReader.ParseError
+import lib.util.unreachable
 
 object TokenReader:
 
@@ -14,15 +15,28 @@ object TokenReader:
 class TokenReader(private val rawReader: Iterator[Char]) extends Iterable[Either[ParseError, Token]]:
 
     private val tokens: LazyList[Either[ParseError, Token]] =
-        LazyList.unfold(LazyList.from(rawReader)):
-            case LazyList() => None
-            case buffer     => Some:
-                val result = TokenMatcher.candidates.iterator
-                                         .map(_(buffer))
-                                         .collectFirst { case Some(value) => value }
-                result match
-                    case None                      => (Left(ParseError.NoMatch), LazyList.empty)
-                    case Some(token, nextLazyList) => (Right(token), nextLazyList)
+        LazyList
+            .unfold(LazyList.from(rawReader)):
+                case LazyList() => None
+                case buffer     => Some:
+                    val result = TokenMatcher.candidates.iterator
+                                             .map(_(buffer))
+                                             .collectFirst { case Some(value) => value }
+                    result match
+                        case None =>
+                            val skippableContent = SkippableMatcher.candidates.iterator
+                                                                   .map(_(buffer))
+                                                                   .collectFirst { case Some(buffer) => buffer }
+                            skippableContent match
+                                case Some(buffer) => (Right(None), buffer)
+                                case None         => (Left(ParseError.NoMatch), LazyList.empty)
+
+                        case Some(token, nextLazyList) => (Right(Some(token)), nextLazyList)
+            .flatMap:
+                case Right(None) => Iterable.empty
+                case Right(Some(token)) => Iterable.single(Right(token))
+                case Left(v) => Iterable.single(Left(v))
+
 
     lazy val parsed: Either[ParseError, List[Token]] =
         tokens.foldRight(Right(Nil): Either[ParseError, List[Token]]):
