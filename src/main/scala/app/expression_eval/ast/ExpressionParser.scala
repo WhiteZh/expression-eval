@@ -90,12 +90,12 @@ object ExpressionParser extends Parser[ExpressionNode]:
             case Some(next) => stateLoop(head.a, next):
                 (a, body) =>
                     body.next match
-                        case None       => returnResult(ExpressionNode.BinaryInfixOperator(body.op, a, body.b))
+                        case None       => returnResult(ExpressionNode.BinaryOperatorNode(body.op, a, body.b))
                         case Some(next) => if body.precedence >= next.precedence
-                                           then updateState(ExpressionNode.BinaryInfixOperator(body.op, a, body.b), next)
+                                           then updateState(ExpressionNode.BinaryOperatorNode(body.op, a, body.b), next)
                                            else updateState(a, Body(body.precedence,
                                                                     body.op,
-                                                                    ExpressionNode.BinaryInfixOperator(next.op, body.b, next.b),
+                                                                    ExpressionNode.BinaryOperatorNode(next.op, body.b, next.b),
                                                                     next.next))
 
     private object OperatorChainParser:
@@ -104,15 +104,15 @@ object ExpressionParser extends Parser[ExpressionNode]:
 
         extension (op: UnaryOpType)
             private def buildNodeWith(value: ExpressionNode): ExpressionNode = op match
-                case OperatorPlus  => ExpressionNode.UnaryInfixOperator(identity, value)
-                case OperatorMinus => ExpressionNode.UnaryInfixOperator(-_, value)
+                case OperatorPlus  => ExpressionNode.UnaryOperatorNode(identity, value)
+                case OperatorMinus => ExpressionNode.UnaryOperatorNode(-_, value)
 
         private def compressUnaryOps(ops: Iterable[UnaryOpType], value: ExpressionNode): ExpressionNode =
             ops.foldLeft(value)((node, op) => op.buildNodeWith(node))
 
         private def takeFirstNode(elements: List[Element]): Either[SyntaxError, (ExpressionNode, List[Element])] =
             stateLoop(ListBuffer.empty: ListBuffer[UnaryOpType], elements) {
-                case (buffer, Number(num) :: restList)            => returnResult(Right((compressUnaryOps(buffer, ExpressionNode.Value(num)), restList)))
+                case (buffer, Number(num) :: restList)            => returnResult(Right((compressUnaryOps(buffer, ExpressionNode.NumberNode(num)), restList)))
                 case (buffer, Bracket(innerElements) :: restList) => returnResult:
                     val inner = OperatorChainParser.parse(innerElements)
                     inner.map { innerOPC => (compressUnaryOps(buffer, innerOPC.toNode), restList) }
