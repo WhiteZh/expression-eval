@@ -32,10 +32,9 @@ class TokenReader(private val rawReader: Iterator[Char]) extends Iterable[Either
                                 case None         => (Left(ParseError.NoMatch), LazyList.empty)
 
                         case Some(token, nextLazyList) => (Right(Some(token)), nextLazyList)
-            .flatMap:
-                case Right(None) => Iterable.empty
-                case Right(Some(token)) => Iterable.single(Right(token))
-                case Left(v) => Iterable.single(Left(v))
+            .collect:
+                case Right(Some(token)) => Right(token)
+                case Left(v) => Left(v)
 
 
     lazy val parsed: Either[ParseError, List[Token]] =
