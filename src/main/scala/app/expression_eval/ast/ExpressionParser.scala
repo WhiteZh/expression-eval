@@ -1,20 +1,13 @@
 package app.expression_eval.ast
 
 import app.expression_eval.token.Token
-import app.expression_eval.{Error, NumericType}
+import app.expression_eval.{NumericType, ParseError}
 import lib.util.ExplicitStatePassing.*
 
 import scala.collection.mutable.ListBuffer
 import scala.util.control.TailCalls.*
 
 object ExpressionParser extends Parser[ExpressionNode]:
-    enum SyntaxError extends Error:
-        case UnexpectedTokens(tokens: List[Token])
-        case MissingEnclosingBracket
-        case SyntaxError
-
-        override def toString: String = s"SyntaxError: $this"
-
     private enum Element:
         case Number(value: NumericType)
         case OperatorPlus
@@ -28,6 +21,8 @@ object ExpressionParser extends Parser[ExpressionNode]:
         type BinaryOpType = OperatorPlus.type | OperatorMinus.type | OperatorTimes.type | OperatorDiv.type
 
     private object ElementListParser:
+
+        private val MissingEnclosedParenthesis = ParseError.SyntaxError("missing enclosed parenthesis")
 
         private type OneToOneToken = Token.Number |
                                      Token.Plus.type |
@@ -46,7 +41,7 @@ object ExpressionParser extends Parser[ExpressionNode]:
         private def partialParse
             (buffer: ListBuffer[Element], tokens: List[Token])
             (insideBracket: Boolean)
-        : TailRec[Either[SyntaxError, (ListBuffer[Element], List[Token])]] =
+        : TailRec[Either[ParseError, (ListBuffer[Element], List[Token])]] =
             tokens match
                 case (token: OneToOneToken) :: resTokens => tailcall(partialParse(buffer :+ token.toElement, resTokens)(insideBracket))
 
@@ -56,20 +51,19 @@ object ExpressionParser extends Parser[ExpressionNode]:
                         case Right(innerBuffer, resTokens) => tailcall(partialParse(buffer :+ Element.Bracket(innerBuffer.toList), resTokens)(insideBracket))
 
                 case Token.BracketEnd :: resTokens => done(if insideBracket then Right((buffer, resTokens))
-                                                           else Left(SyntaxError.UnexpectedTokens(Token.BracketEnd :: resTokens)))
-                case Nil                           => done(if insideBracket then Left(SyntaxError.MissingEnclosingBracket)
+                                                           else Left(ParseError.UnexpectedTokens(Token.BracketEnd :: resTokens)))
+                case Nil                           => done(if insideBracket then Left(MissingEnclosedParenthesis)
                                                            else Right((buffer, Nil)))
 
-        def parse(tokens: List[Token]): Either[SyntaxError, List[Element]] =
+        def parse(tokens: List[Token]): Either[ParseError, List[Element]] =
             partialParse(ListBuffer.empty, tokens)(false).result.flatMap:
                 case (elements, Nil) => Right(elements.toList)
-                case (_, tokens)     => Left(SyntaxError.UnexpectedTokens(tokens))
+                case (_, tokens)     => Left(ParseError.UnexpectedTokens(tokens))
 
     private object OperatorChain:
         type OpType = (NumericType, NumericType) => NumericType
-        type BodyLike = (Int, OpType, ExpressionNode)
 
-        def fromSeq(a: ExpressionNode, seq: Seq[BodyLike]): OperatorChain =
+        def fromSeq(a: ExpressionNode, seq: Seq[(Int, OpType, ExpressionNode)]): OperatorChain =
             val bodySeq = seq.foldRight(None: Option[Body]):
                 (body, next) =>
                     val (precedence: Int, op: OpType, b: ExpressionNode) = body
@@ -110,15 +104,15 @@ object ExpressionParser extends Parser[ExpressionNode]:
         private def compressUnaryOps(ops: Iterable[UnaryOpType], value: ExpressionNode): ExpressionNode =
             ops.foldLeft(value)((node, op) => op.buildNodeWith(node))
 
-        private def takeFirstNode(elements: List[Element]): Either[SyntaxError, (ExpressionNode, List[Element])] =
+        private def takeFirstNode(elements: List[Element]): Either[ParseError, (ExpressionNode, List[Element])] =
             stateLoop(ListBuffer.empty: ListBuffer[UnaryOpType], elements) {
                 case (buffer, Number(num) :: restList)            => returnResult(Right((compressUnaryOps(buffer, ExpressionNode.NumberNode(num)), restList)))
                 case (buffer, Bracket(innerElements) :: restList) => returnResult:
                     val inner = OperatorChainParser.parse(innerElements)
                     inner.map { innerOPC => (compressUnaryOps(buffer, innerOPC.toNode), restList) }
                 case (buffer, (unaryOp: UnaryOpType) :: restList) => updateState(buffer :+ unaryOp, restList)
-                case (_, _ :: _)                                  => returnResult(Left(SyntaxError.SyntaxError))
-                case (_, Nil)                                     => returnResult(Left(SyntaxError.SyntaxError))
+                case (_, _ :: _)                                  => returnResult(Left(ParseError.SyntaxError()))
+                case (_, Nil)                                     => returnResult(Left(ParseError.SyntaxError()))
             }
 
         extension (op: BinaryOpType)
@@ -128,7 +122,7 @@ object ExpressionParser extends Parser[ExpressionNode]:
                 case OperatorTimes => (2, _ * _, node)
                 case OperatorDiv   => (2, _ / _, node)
 
-        def parse(elements: List[Element]): Either[SyntaxError, OperatorChain] =
+        def parse(elements: List[Element]): Either[ParseError, OperatorChain] =
             takeFirstNode(elements).flatMap:
                 (head, tailElements) =>
                     stateLoop(ListBuffer.empty: ListBuffer[OperatorChain.BodyLike], tailElements):
@@ -141,9 +135,9 @@ object ExpressionParser extends Parser[ExpressionNode]:
                                 Right(operatorChain)
                             case Right(node, tailElements) => updateState(buffer :+ op.buildBodyLikeWith(node), tailElements)
 
-                        case _ => returnResult(Left(SyntaxError.SyntaxError))
+                        case _ => returnResult(Left(ParseError.SyntaxError()))
 
-    override def parse(tokens: List[Token]): Either[SyntaxError, ExpressionNode] =
+    override def parse(tokens: List[Token]): Either[ParseError, ExpressionNode] =
         for
             elementList <- ElementListParser.parse(tokens)
             operatorChain <- OperatorChainParser.parse(elementList)

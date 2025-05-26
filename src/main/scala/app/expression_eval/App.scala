@@ -26,7 +26,7 @@ object App:
         catch
             case e: Exception => e.printStackTrace()
 
-    private def evaluate(iter: Iterator[Char]): Either[Error, NumericType] =
+    private def evaluate(iter: Iterator[Char]): Either[ParseError, NumericType] =
         for
             tokens <- TokenReader(iter).parsed
             node <- ExpressionParser.parse(tokens)

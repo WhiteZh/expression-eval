@@ -1,16 +1,7 @@
 package app.expression_eval.token
 
-import app.expression_eval.Error
-import app.expression_eval.token.TokenReader.ParseError
+import app.expression_eval.ParseError
 import lib.util.unreachable
-
-object TokenReader:
-
-    enum ParseError extends Error:
-        case NoMatch
-
-        override def toString: String = s"ParseError: $this"
-
 
 class TokenReader(private val rawReader: Iterator[Char]) extends Iterable[Either[ParseError, Token]]:
 
