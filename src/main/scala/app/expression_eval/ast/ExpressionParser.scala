@@ -62,8 +62,9 @@ object ExpressionParser extends Parser[ExpressionNode]:
 
     private object OperatorChain:
         type OpType = (NumericType, NumericType) => NumericType
+        type BodyLike = (Int, OpType, ExpressionNode)
 
-        def fromSeq(a: ExpressionNode, seq: Seq[(Int, OpType, ExpressionNode)]): OperatorChain =
+        def fromSeq(a: ExpressionNode, seq: Seq[BodyLike]): OperatorChain =
             val bodySeq = seq.foldRight(None: Option[Body]):
                 (body, next) =>
                     val (precedence: Int, op: OpType, b: ExpressionNode) = body
