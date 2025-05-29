@@ -1,5 +1,3 @@
-package app
+package app.expression_eval
 
-package object expression_eval:
-
-    type NumericType = Double
+type NumericType = Double
