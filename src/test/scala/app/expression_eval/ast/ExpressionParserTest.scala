@@ -3,21 +3,25 @@ package app.expression_eval.ast
 import app.expression_eval.token.Token
 import org.scalatest.funsuite.AnyFunSuiteLike
 
-private val N  = Token.Number
-private val P  = Token.Plus
-private val M  = Token.Minus
-private val T  = Token.Times
-private val D  = Token.Div
-private val Bs = Token.BracketStart
-private val Be = Token.BracketEnd
+object ExpressionParserTest:
+    private val N  = Token.Number
+    private val P  = Token.Plus
+    private val M  = Token.Minus
+    private val T  = Token.Times
+    private val D  = Token.Div
+    private val Bs = Token.BracketStart
+    private val Be = Token.BracketEnd
 
-given Conversion[Double, Token.Number] with
-    override def apply(x: Double): Token.Number = N(x)
+    given Conversion[Double, Token.Number] with
+        override def apply(x: Double): Token.Number = N(x)
 
-given Conversion[Int, Token.Number] with
-    override def apply(x: Int): Token.Number = N(x)
+    given Conversion[Int, Token.Number] with
+        override def apply(x: Int): Token.Number = N(x)
 
 class ExpressionParserTest extends AnyFunSuiteLike:
+    import ExpressionParserTest.*
+    import ExpressionParserTest.given
+
     test("addition"):
         val tokens         = List[Token](2.0, P, 3.0)
         val expectedResult = 5.0
