@@ -18,7 +18,7 @@ object App:
             case Array(name) => run(Source.fromURL(name).iter)
             case _           => unreachable
 
-    private def run(iter: Iterator[Char]): Unit =
+    def run(iter: Iterator[Char]): Unit =
         try
             evaluate(iter) match
                 case Left(e)      => println(e)
