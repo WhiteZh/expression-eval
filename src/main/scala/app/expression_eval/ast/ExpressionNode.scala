@@ -119,7 +119,9 @@ object ExpressionNode:
                                                 secondaryNextOperand,
                                                 restTokens)
 
-                            case None => returnResult(None)
+                            case None =>
+                                returnResult:
+                                    Some(BinaryOperatorNode(binaryToken.binaryFunction, headOperand, nextOperand), restTokens)
             yield result
 
     case class BracketNode(node: ExpressionNode) extends ExpressionNode:
